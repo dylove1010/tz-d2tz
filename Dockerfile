@@ -1,15 +1,16 @@
-FROM python:3.11-slim
+FROM python:3.11-alpine
 
-# ① 最小化安装（仅 driver + 字体）
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium-driver fonts-liberation && \
-    rm -rf /var/lib/apt/lists/*
+# 1. 装最小依赖 + chromium-driver（37 MB）
+RUN apk add --no-cache \
+    chromium-chromedriver \
+    chromium \
+    libstdc++
 
-# ② Python 依赖
+# 2. 装 Python 包
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ③ 拷代码
+# 3. 拷代码
 COPY . /app
 WORKDIR /app
 
