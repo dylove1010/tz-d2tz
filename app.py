@@ -1,12 +1,14 @@
-import asyncio, logging, os, requests
-from apscheduler.schedulers.background import BackgroundScheduler
+import os, requests, logging
 from flask import Flask
-from playwright.async_api import async_playwright
+from apscheduler.schedulers.background import BackgroundScheduler
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 
 # ========== 配置 ==========
 WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0bcfe46-3aa1-4071-afd5-da63be5a8644"
 TARGET_URL  = "https://www.d2tz.info/?l=zh-cn"
-WAIT_TIME   = 10          # 秒
+WAIT_TIME   = 10
 # ==========================
 
 logging.basicConfig(level=logging.INFO)
@@ -15,53 +17,42 @@ logger = logging.getLogger(__name__)
 app   = Flask(__name__)
 sched = BackgroundScheduler()
 
-async def fetch_terror_info():
-    """抓取当前 & 下一个恐怖地带"""
-    async with async_playwright() as p:
-       browser = await p.chromium.launch(
-    executable_path="/usr/bin/chromium-browser",
-    headless=True,
-    args=[
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--single-process"  # 关键省内存
-    ]
-)
-        page = await browser.new_page()
-        await page.set_extra_http_headers({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
-        })
-
-        for attempt in range(3):
-            try:
-                await page.goto(TARGET_URL, timeout=60_000)
-                break
-            except Exception as e:
-                logger.warning("访问页面失败 (%d/3): %s", attempt+1, e)
-                if attempt == 2:
-                    await browser.close(); return None,None,None,None
-                await asyncio.sleep(2)
-
-        try:
-            await page.wait_for_selector("tbody[role='rowgroup'] tr", timeout=WAIT_TIME*1000)
-            rows = await page.query_selector_all("tbody[role='rowgroup'] tr")
-            results = []
-            for row in rows:
-                cells = await row.query_selector_all("td")
-                if len(cells) >= 2:
-                    time_text = (await cells[0].inner_text()).strip()
-                    area_text = (await cells[1].inner_text()).strip()
-                    results.append((time_text, area_text))
-            await browser.close()
-            if len(results) < 2: return None,None,None,None
-            next_time, next_area = results[0]
-            current_time, current_area = results[1]
-            return current_area, current_time, next_area, next_time
-        except Exception as e:
-            logger.warning("抓取失败: %s", e)
-            await browser.close(); return None,None,None,None
+def fetch_terror_info():
+    """Selenium 抓取当前 & 下一个恐怖地带"""
+    options = Options()
+    options.binary_location = "/usr/bin/chromium-driver"   # 系统驱动
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-setuid-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--single-process")               # 省内存
+    driver = webdriver.Chrome(options=options)
+    try:
+        driver.get(TARGET_URL)
+        # 等待表格渲染
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        WebDriverWait(driver, WAIT_TIME).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "tbody[role='rowgroup'] tr"))
+        )
+        rows = driver.find_elements(By.CSS_SELECTOR, "tbody[role='rowgroup'] tr")
+        out = []
+        for row in rows[:2]:
+            cells = row.find_elements(By.TAG_NAME, "td")
+            if len(cells) >= 2:
+                time_text = cells[0].text.strip()
+                area_text = cells[1].text.strip()
+                out.append((time_text, area_text))
+        if len(out) < 2:
+            return None, None, None, None
+        next_time, next_area = out[0]
+        current_time, current_area = out[1]
+        return current_area, current_time, next_area, next_time
+    except Exception as e:
+        logger.warning("抓取失败: %s", e)
+        return None, None, None, None
+    finally:
+        driver.quit()
 
 def send_wecom_message(c, ct, n, nt):
     ct_fmt = ct.replace("2025/", "") if ct else "信息未抓取到"
@@ -73,27 +64,25 @@ def send_wecom_message(c, ct, n, nt):
     rsp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}})
     logger.info("WeCom response: %s", rsp.json())
 
-async def main_job():
+def main_job():
     logger.info("Scheduled task triggered")
-    c, ct, n, nt = await fetch_terror_info()
+    c, ct, n, nt = fetch_terror_info()
     send_wecom_message(c, ct, n, nt)
     logger.info("Scheduled task completed")
 
 # 定时任务：每小时 1 次
-sched.add_job(lambda: asyncio.run(main_job()), "interval", hours=1, id="tz_job")
+sched.add_job(main_job, "interval", hours=1, id="tz_job")
 sched.start()
 
-# Flask 路由
 @app.route("/")
 def index():
     return "tz-bot is running!", 200
 
 @app.route("/test")
 def test():
-    asyncio.run(main_job())
+    main_job()
     return "manual push done", 200
 
-# 兼容 Render 端口
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
