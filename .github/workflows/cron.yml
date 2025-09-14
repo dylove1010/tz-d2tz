@@ -10,4 +10,4 @@ jobs:
       - name: curl /test
         run: |
           sleep 20
-          curl -f https://tz-d2tz-1.onrender.com/test
+          curl -f https://tz-d2tz-1.onrender.com/
