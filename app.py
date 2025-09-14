@@ -43,9 +43,9 @@ def fetch_terror_info():
         driver.quit()
 
 def send_wecom_message(c, ct, n, nt):
-    now  = c or "暂无"
-    soon = n or "暂无"
-    content = f"{now}▶{soon}"          # 纯区域，▶ 分隔
+    now  = c or ""
+    soon = n or ""
+    content = f"{now}▶{soon}".strip()   # 纯区域，只留 ▶
     rsp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}})
     logger.info("WeCom response: %s", rsp.json())
 
