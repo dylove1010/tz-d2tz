@@ -6,11 +6,10 @@ RUN apk add --no-cache \
     chromium \
     libstdc++
 
-# 2. 装 Python 包
+# 2. 修索引 + 升级 pip + 装包（缓存层）
 COPY requirements.txt .
-RUN python -m pip install --upgrade pip && \
-    pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && \
+    pip install -i https://pypi.org/simple --no-cache-dir -r requirements.txt
 
 # 3. 拷代码
 COPY . /app
