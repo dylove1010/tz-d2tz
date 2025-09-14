@@ -1,15 +1,9 @@
-import os, requests, logging
+import os, requests, logging, datetime
 from flask import Flask
 from apscheduler.schedulers.background import BackgroundScheduler
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
 
-# ========== 配置 ==========
 WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0bcfe46-3aa1-4071-afd5-da63be5a8644"
-TARGET_URL  = "https://www.d2tz.info/?l=zh-cn"
-WAIT_TIME   = 10
-# ==========================
+API_URL     = "https://www.d2tz.info/api/terror-zone"   # 公开接口（示例）
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -18,41 +12,18 @@ app   = Flask(__name__)
 sched = BackgroundScheduler()
 
 def fetch_terror_info():
-    """Selenium 抓取当前 & 下一个恐怖地带"""
-    options = Options()
-    options.binary_location = "/usr/bin/chromium-driver"   # 系统驱动
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-setuid-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--single-process")               # 省内存
-    driver = webdriver.Chrome(options=options)
+    """纯 requests 抓接口，无浏览器"""
     try:
-        driver.get(TARGET_URL)
-        # 等待表格渲染
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        WebDriverWait(driver, WAIT_TIME).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "tbody[role='rowgroup'] tr"))
-        )
-        rows = driver.find_elements(By.CSS_SELECTOR, "tbody[role='rowgroup'] tr")
-        out = []
-        for row in rows[:2]:
-            cells = row.find_elements(By.TAG_NAME, "td")
-            if len(cells) >= 2:
-                time_text = cells[0].text.strip()
-                area_text = cells[1].text.strip()
-                out.append((time_text, area_text))
-        if len(out) < 2:
-            return None, None, None, None
-        next_time, next_area = out[0]
-        current_time, current_area = out[1]
-        return current_area, current_time, next_area, next_time
+        r = requests.get(API_URL, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        # 假设返回 {"current":{"area":"xxx","time":"2025/06/19 08:00"},"next":{...}}
+        current = data.get("current", {})
+        next_   = data.get("next", {})
+        return current.get("area"), current.get("time"), next_.get("area"), next_.get("time")
     except Exception as e:
-        logger.warning("抓取失败: %s", e)
+        logger.warning("接口抓取失败: %s", e)
         return None, None, None, None
-    finally:
-        driver.quit()
 
 def send_wecom_message(c, ct, n, nt):
     ct_fmt = ct.replace("2025/", "") if ct else "信息未抓取到"
@@ -70,7 +41,6 @@ def main_job():
     send_wecom_message(c, ct, n, nt)
     logger.info("Scheduled task completed")
 
-# 定时任务：每小时 1 次
 sched.add_job(main_job, "interval", hours=1, id="tz_job")
 sched.start()
 
