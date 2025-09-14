@@ -45,20 +45,18 @@ def fetch_terror_info():
 def send_wecom_message(c, ct, n, nt):
     now  = c or "暂无"
     soon = n or "暂无"
-    content = f"{c or '暂无'}▶{n or '暂无'}"   # 纯区域
+    content = f"{now}▶{soon}"          # 纯区域，▶ 分隔
     rsp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}})
     logger.info("WeCom response: %s", rsp.json())
 
-# ---------- 启动即推 ----------
-with app.app_context():
+# ---------- 根路由即推 ----------
+@app.route("/")
+def index():
     c, ct, n, nt = fetch_terror_info()
     if c or n:
         send_wecom_message(c, ct, n, nt)
-# ------------------------------
-
-@app.route("/")
-def index():
     return "tz-bot is running!", 200
+# ------------------------------
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
