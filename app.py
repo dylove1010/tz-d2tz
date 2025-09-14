@@ -1,26 +1,47 @@
 import os, requests, logging
 from flask import Flask
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0bcfe46-3aa1-4071-afd5-da63be5a8644"
-API_URL     = "https://www.d2tz.info/api/terror-zone"   # 公开接口（示例）
+TARGET_URL  = "https://www.d2tz.info/?l=zh-cn"
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
 def fetch_terror_info():
+    """最小 Selenium：只开 driver，抓 2 行就关"""
+    options = Options()
+    options.binary_location = "/usr/bin/chromium-driver"  # 系统自带
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-setuid-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--single-process")  # 关键省内存
+    driver = webdriver.Chrome(options=options)
     try:
-        r = requests.get(API_URL, timeout=10)
-        r.raise_for_status()
-        logger.info("原始响应: %s", r.text)   # ← 加这句（打印完整文本）
-        data = r.json()
-        current = data.get("current", {})
-        next_   = data.get("next", {})
-        return current.get("area"), current.get("time"), next_.get("area"), next_.get("time")
-    except Exception as e:
-        logger.warning("接口抓取失败: %s", e)
-        return None, None, None, None
+        driver.get(TARGET_URL)
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "tbody[role='rowgroup'] tr"))
+        )
+        rows = driver.find_elements(By.CSS_SELECTOR, "tbody[role='rowgroup'] tr")[:2]
+        out = []
+        for row in rows:
+            cells = row.find_elements(By.TAG_NAME, "td")
+            if len(cells) >= 2:
+                out.append((cells[0].text.strip(), cells[1].text.strip()))
+        if len(out) < 2:
+            return None, None, None, None
+        next_time, next_area = out[0]
+        current_time, current_area = out[1]
+        return current_area, current_time, next_area, next_time
+    finally:
+        driver.quit()
 
 def send_wecom_message(c, ct, n, nt):
     ct_fmt = ct.replace("2025/", "") if ct else "信息未抓取到"
@@ -35,7 +56,8 @@ def send_wecom_message(c, ct, n, nt):
 # ---------- 启动即推 ----------
 with app.app_context():
     c, ct, n, nt = fetch_terror_info()
-    send_wecom_message(c, ct, n, nt)
+    if c or n:
+        send_wecom_message(c, ct, n, nt)
 # ------------------------------
 
 @app.route("/")
