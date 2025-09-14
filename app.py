@@ -13,6 +13,7 @@ def fetch_terror_info():
     try:
         r = requests.get(API_URL, timeout=10)
         r.raise_for_status()
+        logger.info("原始响应: %s", r.text)   # ← 加这句（打印完整文本）
         data = r.json()
         current = data.get("current", {})
         next_   = data.get("next", {})
