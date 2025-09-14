@@ -8,7 +8,9 @@ RUN apk add --no-cache \
 
 # 2. 装 Python 包
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --upgrade pip && \
+    pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip install --no-cache-dir -r requirements.txt
 
 # 3. 拷代码
 COPY . /app
