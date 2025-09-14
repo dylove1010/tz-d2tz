@@ -1,0 +1,4 @@
+Flask==2.3.3
+requests==2.32.0
+apscheduler==3.11.1
+playwright==1.39.1
