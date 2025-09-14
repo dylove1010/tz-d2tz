@@ -17,11 +17,10 @@ sched = BackgroundScheduler()
 async def fetch_terror_info():
     async with async_playwright() as p:
         # Render 装好的 chromium 路径
-        browser = await p.chromium.launch(
-            executable_path=os.getenv("PLAYWRIGHT_CHROMIUM_PATH", "/usr/bin/chromium"),
-            headless=True,
-            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
-        )
+       browser = await p.chromium.launch(
+    headless=True,
+    args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+)
         page = await browser.new_page()
         await page.set_extra_http_headers({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
