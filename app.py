@@ -15,14 +15,13 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 def fetch_terror_info():
-    """最小 Selenium：只开 driver，抓 2 行就关"""
     options = Options()
-    options.binary_location = "/usr/bin/chromium-driver"  # 系统自带
+    options.binary_location = "/usr/bin/chromium-driver"
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-setuid-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--single-process")  # 关键省内存
+    options.add_argument("--single-process")
     driver = webdriver.Chrome(options=options)
     try:
         driver.get(TARGET_URL)
@@ -44,12 +43,9 @@ def fetch_terror_info():
         driver.quit()
 
 def send_wecom_message(c, ct, n, nt):
-    ct_fmt = ct.replace("2025/", "") if ct else "信息未抓取到"
-    nt_fmt = nt.replace("2025/", "") if nt else "信息未抓取到"
-    content = (f"当前恐怖地带开始时间: {ct_fmt}\n"
-               f"当前恐怖地带: 【{c or '信息未抓取到'}】\n"
-               f"下一个恐怖地带开始时间: {nt_fmt}\n"
-               f"下一个恐怖地带: 【{n or '信息未抓取到'}】")
+    now  = c or "暂无"
+    soon = n or "暂无"
+    content = f"{now}▶{soon}"          # 纯区域，▶ 分隔
     rsp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}})
     logger.info("WeCom response: %s", rsp.json())
 
