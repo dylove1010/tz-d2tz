@@ -1,0 +1,2 @@
+[tool.poetry]
+python = "^3.11"
