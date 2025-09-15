@@ -6,6 +6,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+try:
+    requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": "启动中▶启动中"}}, timeout=5)
+except Exception:
+    pass
+
 WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0bcfe46-3aa1-4071-afd5-da63be5a8644"
 TARGET_URL  = "https://www.d2tz.info/?l=zh-cn"
 
