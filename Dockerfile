@@ -1,5 +1,5 @@
 # 使用与 Playwright 版本匹配的官方镜像
-FROM mcr.microsoft.com/playwright/python:v1.55.0-jammy
+FROM mcr.microsoft.com/playwright/python:1.55.0-jammy
 
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
