@@ -1,86 +1,86 @@
+# app.py
 import os
-import requests
 import logging
+import requests
 from flask import Flask
-from bs4 import BeautifulSoup
 from threading import Thread
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
-WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0bcfe46-3aa1-4071-afd5-da63be5a8644"
-TARGET_URL = "https://www.d2tz.info/?l=zh-cn"
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=你的key")
+TARGET_URL  = "https://www.d2tz.info/?l=zh-cn"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
-
 app = Flask(__name__)
 
 def fetch_terror_info():
-    """抓取当前和下一个恐怖地带信息"""
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    driver = webdriver.Chrome(options=options)
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) "
-                          "Chrome/122.0.0.0 Safari/537.36"
-        }
-        resp = requests.get(TARGET_URL, headers=headers, timeout=10)
-        resp.raise_for_status()
-        logger.info("页面获取成功，长度=%s", len(resp.text))
-        logger.info("前500字符:\n%s", resp.text[:500])
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-        rows = soup.select("tbody[role='rowgroup'] tr")[:2]
-
+        driver.get(TARGET_URL)
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "tbody[role='rowgroup'] tr"))
+        )
+        rows = driver.find_elements(By.CSS_SELECTOR, "tbody[role='rowgroup'] tr")[:2]
         out = []
         for row in rows:
-            cells = row.select("td")
+            cells = row.find_elements(By.TAG_NAME, "td")
             if len(cells) >= 2:
-                area_raw = cells[1].get_text(strip=True)
-                # 去掉 "Now" / "Coming soon" 等字样
-                area_only = area_raw.split("▶")[-1]
-                out.append((cells[0].get_text(strip=True), area_only))
-
+                # 清理文本，去掉 "Coming soon / Now"
+                area_text = cells[1].text.strip().replace("Coming soon", "").replace("Now", "").strip()
+                out.append((cells[0].text.strip(), area_text))
         if len(out) < 2:
             return None, None, None, None
-
-        # 注意顺序：最新的在前面，所以第1条是下一个，第2条是当前
+        # 当前 = 第 1 个生效的，下一个 = 第 2 个
         next_time, next_area = out[0]
         current_time, current_area = out[1]
         return current_area, current_time, next_area, next_time
     except Exception as e:
-        logger.exception("fetch_terror_info 出错")
+        logger.warning(f"抓取失败: {e}")
         return None, None, None, None
+    finally:
+        driver.quit()
 
 def send_wecom_message(current, current_time, next_, next_time):
-    """推送文字消息到企业微信"""
+    msg_lines = []
     current_time_fmt = current_time or "信息未抓取到"
-    next_time_fmt = next_time or "信息未抓取到"
-    current_area_fmt = current or "信息未抓取到"
-    next_area_fmt = next_ or "信息未抓取到"
+    next_time_fmt    = next_time or "信息未抓取到"
+    current_area_fmt = f"【{current}】" if current else "暂无"
+    next_area_fmt    = f"【{next_}】" if next_ else "暂无"
 
-    content = (f"当前恐怖地带开始时间: {current_time_fmt}\n"
-               f"当前恐怖地带: 【{current_area_fmt}】\n"
-               f"下一个恐怖地带开始时间: {next_time_fmt}\n"
-               f"下一个恐怖地带: 【{next_area_fmt}】")
+    msg_lines.append(f"当前恐怖地带开始时间: {current_time_fmt}")
+    msg_lines.append(f"当前恐怖地带: {current_area_fmt}")
+    msg_lines.append(f"下一个恐怖地带开始时间: {next_time_fmt}")
+    msg_lines.append(f"下一个恐怖地带: {next_area_fmt}")
+
+    data = {"msgtype": "text", "text": {"content": "\n".join(msg_lines)}}
     try:
-        rsp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}}, timeout=5)
-        logger.info("WeCom response: %s", rsp.json())
+        resp = requests.post(WEBHOOK_URL, json=data, timeout=5)
+        logger.info(f"WeCom response: {resp.json()}")
     except Exception as e:
-        logger.exception("推送企业微信失败")
+        logger.warning(f"WeCom 推送失败: {e}")
 
 def push_job():
-    try:
-        current, current_time, next_, next_time = fetch_terror_info()
-        send_wecom_message(current, current_time, next_, next_time)
-    except Exception:
-        # 如果抓取失败，推送占位信息
+    current, current_time, next_, next_time = fetch_terror_info()
+    if not current and not next_:
+        logger.info("未获取到信息，发送占位")
         requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": "后台▶后台"}}, timeout=5)
+    else:
+        send_wecom_message(current, current_time, next_, next_time)
 
-# ---------- 根路由 ---------- 
 @app.route("/")
 def index():
-    # 后台线程推送，不阻塞 Render 检测
     Thread(target=push_job, daemon=True).start()
     return "tz-bot is running!", 200
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
