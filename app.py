@@ -1,8 +1,10 @@
-import asyncio
-import logging
+import os, requests, logging
 from flask import Flask
-from playwright.async_api import async_playwright
-import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0bcfe46-3aa1-4071-afd5-da63be5a8644"
 TARGET_URL  = "https://www.d2tz.info/?l=zh-cn"
@@ -12,44 +14,50 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-async def fetch_terror_info():
-    """抓取前两个恐怖地带信息"""
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        await page.goto(TARGET_URL, timeout=60000)
-        await page.wait_for_selector("tbody[role='rowgroup'] tr", timeout=10000)
-        rows = await page.query_selector_all("tbody[role='rowgroup'] tr")
-        results = []
-        for row in rows[:2]:
-            cells = await row.query_selector_all("td")
-            if len(cells) >= 2:
-                area_raw = (await cells[1].inner_text()).strip()
-                # 去掉 "Now▶" / "Coming soon▶"
-                area_only = area_raw.split("▶")[-1].strip()
-                results.append(area_only)
-        await browser.close()
-        if len(results) < 2:
-            return "未获取到信息", "未获取到信息"
-        return results[0], results[1]
-
-def send_wecom_message(current, next_):
-    content = f"{current} ▶ {next_}"
+def fetch_terror_info():
+    options = Options()
+    options.binary_location = "/usr/bin/chromium-driver"
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-setuid-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--single-process")
+    driver = webdriver.Chrome(options=options)
     try:
-        resp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}}, timeout=10)
-        logger.info("WeCom response: %s", resp.json())
-    except Exception as e:
-        logger.error("WeCom push failed: %s", e)
+        driver.get(TARGET_URL)
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "tbody[role='rowgroup'] tr"))
+        )
+        rows = driver.find_elements(By.CSS_SELECTOR, "tbody[role='rowgroup'] tr")[:2]
+        out = []
+        for row in rows:
+            cells = row.find_elements(By.TAG_NAME, "td")
+            if len(cells) >= 2:
+                out.append((cells[0].text.strip(), cells[1].text.strip()))
+        if len(out) < 2:
+            return None, None, None, None
+        next_time, next_area = out[0]
+        current_time, current_area = out[1]
+        return current_area, current_time, next_area, next_time
+    finally:
+        driver.quit()
 
-async def main_job():
-    current, next_ = await fetch_terror_info()
-    send_wecom_message(current, next_)
+def send_wecom_message(c, ct, n, nt):
+    now  = c or "暂无"
+    soon = n or "暂无"
+    content = f"{now}▶{soon}"          # 纯区域，▶ 分隔
+    rsp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}})
+    logger.info("WeCom response: %s", rsp.json())
 
+# ---------- 根路由即推 ----------
 @app.route("/")
 def index():
-    # 异步执行，不阻塞 Render 健康检查
-    asyncio.run(main_job())
-    return "tz-bot running!", 200
+    c, ct, n, nt = fetch_terror_info()
+    if c or n:
+        send_wecom_message(c, ct, n, nt)
+    return "tz-bot is running!", 200
+# ------------------------------
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(10000))
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
