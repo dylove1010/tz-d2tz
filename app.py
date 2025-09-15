@@ -8,7 +8,6 @@ TARGET_URL = "https://www.d2tz.info/?l=zh-cn"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 app = Flask(__name__)
 
 async def fetch_terror_info():
