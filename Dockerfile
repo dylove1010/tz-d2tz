@@ -1,19 +1,18 @@
-FROM python:3.11-slim
+# 官方 Playwright 镜像，已自带 Chromium 和依赖
+FROM mcr.microsoft.com/playwright/python:1.40.0-focal
 
 ENV PYTHONUNBUFFERED=1
+WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    fonts-liberation curl wget unzip && \
-    rm -rf /var/lib/apt/lists/*
-
+# 安装 Python 依赖
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 安装 Playwright 浏览器
-RUN playwright install --with-deps
-
+# 复制代码
 COPY . /app
-WORKDIR /app
+
+# Render 端口
 ENV PORT=10000
 
+# 启动 Flask
 CMD ["python", "app.py"]
