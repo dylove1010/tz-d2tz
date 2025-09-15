@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 async def fetch_terror_info():
-    """抓取当前和下一个恐怖地带区域信息"""
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -27,19 +26,17 @@ async def fetch_terror_info():
             cells = await row.query_selector_all("td")
             if len(cells) >= 2:
                 area_raw = (await cells[1].inner_text()).strip()
-                area_only = area_raw.split("▶")[-1]  # 去掉 Now / Coming soon 等字样
+                area_only = area_raw.split("▶")[-1]
                 out.append(area_only)
 
         await browser.close()
 
         if len(out) < 2:
             return None, None
-        # 页面前面是未来一小时，排在最前面，当前正在生效的是第二个
         next_area, current_area = out
         return current_area, next_area
 
 def send_wecom_message(current, next_):
-    """发送企业微信消息"""
     current = current or "信息未抓取到"
     next_ = next_ or "信息未抓取到"
     content = f"{current}▶{next_}"
@@ -57,7 +54,6 @@ async def main_job():
 
 @app.route("/")
 def index():
-    # 异步执行，不阻塞 Render 健康检查
     asyncio.run(main_job())
     return "tz-d2tz bot is running!", 200
 
