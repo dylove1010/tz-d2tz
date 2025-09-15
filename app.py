@@ -35,13 +35,13 @@ def fetch_terror_info():
         )
         rows = driver.find_elements(By.CSS_SELECTOR, "tbody[role='rowgroup'] tr")[:2]
         out = []
-        for row in rows:
-    cells = row.find_elements(By.TAG_NAME, "td")
-    if len(cells) >= 2:
-        # 只取区域，去掉 "Now▶" "Coming soon▶"
-        area_raw = cells[1].text.strip()
-        area_only = area_raw.split("▶")[-1]   # 取 ▶ 后面
-        out.append((cells[0].text.strip(), area_only))
+       for row in rows:
+            cells = row.find_elements(By.TAG_NAME, "td")
+            if len(cells) >= 2:
+                # 只取区域，去掉 "Now▶" "Coming soon▶"
+                area_raw = cells[1].text.strip()
+                area_only = area_raw.split("▶")[-1]   # 取 ▶ 后面
+                out.append((cells[0].text.strip(), area_only))
         if len(out) < 2:
             return None, None, None, None
         next_time, next_area = out[0]
