@@ -1,6 +1,4 @@
-import os
-import asyncio
-import logging
+import os, asyncio, logging
 from flask import Flask
 from playwright.async_api import async_playwright
 import requests
@@ -41,8 +39,8 @@ def send_wecom_message(current, next_):
     next_ = next_ or "信息未抓取到"
     content = f"{current}▶{next_}"
     try:
-        resp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}}, timeout=5)
-        logger.info("WeCom response: %s", resp.json())
+        rsp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}}, timeout=5)
+        logger.info("WeCom response: %s", rsp.json())
     except Exception as e:
         logger.warning(f"WeCom 推送失败: {e}")
 
