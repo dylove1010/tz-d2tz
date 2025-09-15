@@ -20,6 +20,7 @@ def fetch_terror_info():
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-software-rasterizer")
     options.add_argument("--remote-debugging-port=9222")
+    options.add_argument("--host-resolver-rules=MAP * 8.8.8.8")
 
     driver = webdriver.Chrome(options=options)
     driver.get("目标网址替换这里")  # 👈 换成你的恐怖地带页面
