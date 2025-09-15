@@ -1,13 +1,14 @@
 name: call-render
 on:
   schedule:
-    - cron: '7 * * * *'   # 每小时的 07 分，错开高峰
-  workflow_dispatch:      # 保留手动按钮
+    - cron: '1 * * * *'   # 每小时的 01 分，延迟 20-35 秒
+  workflow_dispatch:
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: curl /test
+      - name: curl root (delay 20s + retry)
         run: |
           sleep 20
-          curl -f https://tz-d2tz-1.onrender.com/
+          curl -f --retry 3 --retry-delay 5 --max-time 30 \
+            https://tz-d2tz-1.onrender.com/
