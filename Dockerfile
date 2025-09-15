@@ -1,5 +1,5 @@
-# 官方 Playwright 镜像（使用 latest，带浏览器和依赖）
-FROM mcr.microsoft.com/playwright/python:latest
+# 使用与 Playwright 版本匹配的官方镜像
+FROM mcr.microsoft.com/playwright/python:v1.55.0-jammy
 
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
