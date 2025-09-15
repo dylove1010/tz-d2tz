@@ -3,7 +3,7 @@ from flask import Flask
 from playwright.async_api import async_playwright
 import requests
 
-WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=你的key"
+WEBHOOK_URL = "你的企业微信 webhook"
 TARGET_URL = "https://www.d2tz.info/?l=zh-cn"
 
 logging.basicConfig(level=logging.INFO)
@@ -45,10 +45,8 @@ def send_wecom_message(current, next_):
         logger.warning(f"WeCom 推送失败: {e}")
 
 async def main_job():
-    logger.info("Scheduled task triggered")
     current, next_ = await fetch_terror_info()
     send_wecom_message(current, next_)
-    logger.info("Scheduled task completed")
 
 @app.route("/")
 def index():
