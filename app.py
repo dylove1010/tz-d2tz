@@ -16,10 +16,13 @@ app = Flask(__name__)
 
 def fetch_terror_info():
     options = Options()
-    options.binary_location = "/usr/bin/chromium-driver"
+    options.binary_location = "/usr/bin/chromium-driver"   # 只装 driver
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-web-security")
+    options.add_argument("--disable-features=VizDisplayCompositor")
     driver = webdriver.Chrome(options=options)
     try:
         driver.get(TARGET_URL)
