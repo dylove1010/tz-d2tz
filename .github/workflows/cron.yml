@@ -1,7 +1,7 @@
 name: call-render
 on:
   schedule:
-    - cron: '5 * * * *'   # 每小时的 01 分，延迟 20-35 秒
+    - cron: '12 * * * *'   # 每小时的 01 分，延迟 20-35 秒
   workflow_dispatch:
 jobs:
   ping:
