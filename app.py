@@ -19,9 +19,10 @@ def fetch_terror_info():
     options.binary_location = "/usr/bin/chromium-driver"
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
-    options.add_argument("--disable-setuid-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--single-process")
+    options.add_argument("--disable-gpu")               # 省内存
+    options.add_argument("--disable-web-security")
+    options.add_argument("--disable-features=VizDisplayCompositor")
     driver = webdriver.Chrome(options=options)
     try:
         driver.get(TARGET_URL)
@@ -43,9 +44,9 @@ def fetch_terror_info():
         driver.quit()
 
 def send_wecom_message(c, ct, n, nt):
-    now  = c or ""
-    soon = n or ""
-    content = f"{now}▶{soon}".strip()   # 纯区域，只留 ▶
+    now  = c or "暂无"
+    soon = n or "暂无"
+    content = f"{now}▶{soon}"          # 纯区域，▶ 分隔
     rsp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}})
     logger.info("WeCom response: %s", rsp.json())
 
