@@ -6,11 +6,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-try:
-    requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": "启动中▶启动中"}}, timeout=5)
-except Exception:
-    pass
-
 WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0bcfe46-3aa1-4071-afd5-da63be5a8644"
 TARGET_URL  = "https://www.d2tz.info/?l=zh-cn"
 
@@ -24,9 +19,7 @@ def fetch_terror_info():
     options.binary_location = "/usr/bin/chromium-driver"
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
-    options.add_argument("--disable-setuid-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--single-process")
     driver = webdriver.Chrome(options=options)
     try:
         driver.get(TARGET_URL)
@@ -35,13 +28,13 @@ def fetch_terror_info():
         )
         rows = driver.find_elements(By.CSS_SELECTOR, "tbody[role='rowgroup'] tr")[:2]
         out = []
-    for row in rows:
-        cells = row.find_elements(By.TAG_NAME, "td")
-        if len(cells) >= 2:
-            # 只取区域，去掉 "Now▶" "Coming soon▶"
-            area_raw = cells[1].text.strip()
-            area_only = area_raw.split("▶")[-1]   # 取 ▶ 后面
-            out.append((cells[0].text.strip(), area_only))
+        for row in rows:
+            cells = row.find_elements(By.TAG_NAME, "td")
+            if len(cells) >= 2:
+                # 只取区域，去掉 "Now▶" "Coming soon▶"
+                area_raw = cells[1].text.strip()
+                area_only = area_raw.split("▶")[-1]   # 取 ▶ 后面
+                out.append((cells[0].text.strip(), area_only))
         if len(out) < 2:
             return None, None, None, None
         next_time, next_area = out[0]
@@ -53,7 +46,7 @@ def fetch_terror_info():
 def send_wecom_message(c, ct, n, nt):
     now  = c or "暂无"
     soon = n or "暂无"
-    content = f"{now}▶{soon}".strip()
+    content = f"{now}▶{soon}"          # 纯区域，▶ 分隔
     rsp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}})
     logger.info("WeCom response: %s", rsp.json())
 
