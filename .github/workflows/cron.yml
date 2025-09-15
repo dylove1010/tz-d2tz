@@ -1,13 +1,13 @@
 name: call-render
 on:
   schedule:
-    - cron: '0 * * * *'   # 每整点
+    - cron: '0 * * * *'
   workflow_dispatch:
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: curl root (delay 20s)
+      - name: curl /test
         run: |
           sleep 20
-          curl -f https://tz-d2tz-1.onrender.com  # ← 换成你的域名
+          curl -f https://tz-d2tz-1.onrender.com/
