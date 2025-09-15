@@ -1,10 +1,18 @@
 FROM python:3.11-slim
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium-driver fonts-liberation && \
-    rm -rf /var/lib/apt/lists/*
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . /app
+
+ENV PYTHONUNBUFFERED=1
+
+# 安装 chromium 和 chromedriver
+RUN apt-get update && apt-get install -y \
+    chromium chromium-driver \
+    fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
-ENV PORT=10000
+
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+
 CMD ["python", "app.py"]
