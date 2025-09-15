@@ -1,5 +1,5 @@
-# 官方 Playwright 镜像，已自带 Chromium 和依赖
-FROM mcr.microsoft.com/playwright/python:1.40.0-focal
+# 官方 Playwright 镜像（使用 latest，带浏览器和依赖）
+FROM mcr.microsoft.com/playwright/python:latest
 
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
