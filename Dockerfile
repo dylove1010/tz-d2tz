@@ -1,8 +1,7 @@
-# 官方 Playwright Python 镜像，已自带 Chromium 和依赖
+# 使用官方 Playwright Python 镜像，带 Chromium 和依赖
 FROM mcr.microsoft.com/playwright/python:1.58.0-focal
 
 ENV PYTHONUNBUFFERED=1
-
 WORKDIR /app
 
 COPY requirements.txt .
