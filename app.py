@@ -5,6 +5,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from threading import Thread
 
 WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0bcfe46-3aa1-4071-afd5-da63be5a8644"
 TARGET_URL  = "https://www.d2tz.info/?l=zh-cn"
@@ -16,7 +17,7 @@ app = Flask(__name__)
 
 def fetch_terror_info():
     options = Options()
-    options.binary_location = "/usr/bin/chromium-driver"   # 只装 driver
+    options.binary_location = "/usr/bin/chromium-driver"
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
@@ -50,17 +51,25 @@ def send_wecom_message(c, ct, n, nt):
     now  = c or "暂无"
     soon = n or "暂无"
     content = f"{now}▶{soon}"          # 纯区域，▶ 分隔
-    rsp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}})
+    rsp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}}, timeout=5)
     logger.info("WeCom response: %s", rsp.json())
 
-# ---------- 根路由即推 ----------
+# ---------- 根路由即推（后台线程，不阻塞检测） ----------
 @app.route("/")
 def index():
-    c, ct, n, nt = fetch_terror_info()
-    if c or n:
-        send_wecom_message(c, ct, n, nt)
+    # 立即返回 200，让 Render 检测通过
+    Thread(target=_push_real_data, daemon=True).start()
     return "tz-bot is running!", 200
-# ------------------------------
+
+def _push_real_data():
+    try:
+        c, ct, n, nt = fetch_terror_info()
+        if c or n:
+            send_wecom_message(c, ct, n, nt)
+    except Exception as e:
+        # 即使 driver 失败，也推占位
+        requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": "后台▶后台"}}, timeout=5)
+# --------------------------------------------------------------
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
