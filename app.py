@@ -1,65 +1,63 @@
-import os, requests, logging
+import os
+import logging
+import requests
 from flask import Flask
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from bs4 import BeautifulSoup
 from threading import Thread
 
-WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0bcfe46-3aa1-4071-afd5-da63be5a8644"
+# ====== 配置 ======
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=替换成你的key")
 TARGET_URL  = "https://www.d2tz.info/?l=zh-cn"
 
+# ====== 日志 ======
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
+# ====== Flask 应用 ======
 app = Flask(__name__)
 
 def fetch_terror_info():
-    options = Options()
-    options.binary_location = "/usr/bin/chromium-driver"
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--disable-web-security")
-    options.add_argument("--disable-features=VizDisplayCompositor")
-    driver = webdriver.Chrome(options=options)
-    try:
-        driver.get(TARGET_URL)
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "tbody[role='rowgroup'] tr"))
-        )
-        rows = driver.find_elements(By.CSS_SELECTOR, "tbody[role='rowgroup'] tr")[:2]
-        out = []
-        for row in rows:
-            cells = row.find_elements(By.TAG_NAME, "td")
-            if len(cells) >= 2:
-                # 只取区域，去掉 "Now▶" "Coming soon▶"
-                area_raw = cells[1].text.strip()
-                area_only = area_raw.split("▶")[-1]   # 取 ▶ 后面
-                out.append((cells[0].text.strip(), area_only))
-        if len(out) < 2:
-            return None, None, None, None
-        next_time, next_area = out[0]
-        current_time, current_area = out[1]
-        return current_area, current_time, next_area, next_time
-    finally:
-        driver.quit()
+    """直接请求网页并解析，避免用 Selenium"""
+    resp = requests.get(TARGET_URL, timeout=10, headers={
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) Chrome/120 Safari/537.36"
+    })
+    resp.raise_for_status()
+
+    soup = BeautifulSoup(resp.text, "lxml")
+    rows = soup.select("tbody[role='rowgroup'] tr")[:2]
+
+    out = []
+    for row in rows:
+        cells = row.find_all("td")
+        if len(cells) >= 2:
+            time_text = cells[0].get_text(strip=True)
+            area_text = cells[1].get_text(strip=True)
+            # 去掉 "Now▶" / "Coming soon▶"
+            area_text = area_text.replace("Now", "").replace("Coming soon", "").replace("▶", "").strip()
+            out.append((time_text, area_text))
+
+    if len(out) < 2:
+        return None, None, None, None
+
+    # 网站是「最新在上」，所以第 1 行是下一个，第 2 行是当前
+    next_time, next_area = out[0]
+    current_time, current_area = out[1]
+    return current_area, current_time, next_area, next_time
 
 def send_wecom_message(c, ct, n, nt):
-    now  = c or "暂无"
-    soon = n or "暂无"
-    content = f"{now}▶{soon}"          # 纯区域，▶ 分隔
-    rsp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}}, timeout=5)
+    """推送到企业微信群"""
+    msg = f"{ct} 【{c or '暂无'}】\n{nt} 【{n or '暂无'}】"
+    rsp = requests.post(WEBHOOK_URL, json={
+        "msgtype": "text",
+        "text": {"content": msg}
+    }, timeout=5)
     logger.info("WeCom response: %s", rsp.json())
 
-# ---------- 根路由即推（后台线程，不阻塞检测） ----------
 @app.route("/")
 def index():
-    # 立即返回 200，让 Render 检测通过
+    # 用线程异步推送，不阻塞 Render 的健康检查
     Thread(target=_push_real_data, daemon=True).start()
-    return "tz-bot is running!", 200
+    return "tz-bot running!", 200
 
 def _push_real_data():
     try:
@@ -67,9 +65,11 @@ def _push_real_data():
         if c or n:
             send_wecom_message(c, ct, n, nt)
     except Exception as e:
-        # 即使 driver 失败，也推占位
-        requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": "后台▶后台"}}, timeout=5)
-# --------------------------------------------------------------
+        logger.error("抓取失败: %s", e)
+        requests.post(WEBHOOK_URL, json={
+            "msgtype": "text",
+            "text": {"content": "后台▶后台"}
+        }, timeout=5)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
