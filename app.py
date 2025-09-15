@@ -1,26 +1,31 @@
-import os, requests, logging
+import asyncio
+import logging
+import requests
 from flask import Flask
+from apscheduler.schedulers.background import BackgroundScheduler
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from threading import Thread
-
-WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0bcfe46-3aa1-4071-afd5-da63be5a8644"
-TARGET_URL  = "https://www.d2tz.info/?l=zh-cn"
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+TARGET_URL = "https://your-target-url-here.com"
+WECHAT_URL = "https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=xxx"
+CHAT_ID = "xxx"
+
 
 def fetch_terror_info():
     options = Options()
-    options.binary_location = "/usr/bin/chromium-driver"
-    options.add_argument("--headless")
+    options.add_argument("--headless=new")  # 新版 headless
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--remote-debugging-port=9222")  # 避免 DevToolsActivePort 错误
+
     driver = webdriver.Chrome(options=options)
     try:
         driver.get(TARGET_URL)
@@ -32,9 +37,8 @@ def fetch_terror_info():
         for row in rows:
             cells = row.find_elements(By.TAG_NAME, "td")
             if len(cells) >= 2:
-                # 只取区域，去掉 "Now▶" "Coming soon▶"
                 area_raw = cells[1].text.strip()
-                area_only = area_raw.split("▶")[-1]   # 取 ▶ 后面
+                area_only = area_raw.split("▶")[-1]
                 out.append((cells[0].text.strip(), area_only))
         if len(out) < 2:
             return None, None, None, None
@@ -44,29 +48,42 @@ def fetch_terror_info():
     finally:
         driver.quit()
 
-def send_wecom_message(c, ct, n, nt):
-    now  = c or "暂无"
-    soon = n or "暂无"
-    content = f"{now}▶{soon}"          # 纯区域，▶ 分隔
-    rsp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}}, timeout=5)
-    logger.info("WeCom response: %s", rsp.json())
 
-# ---------- 根路由即推（后台线程，不阻塞检测） ----------
-@app.route("/")
-def index():
-    Thread(target=_push_real_data, daemon=True).start()
-    return "tz-bot is running!", 200
+def push_to_wechat(msg: str):
+    payload = {
+        "touser": CHAT_ID,
+        "msgtype": "text",
+        "agentid": 1000002,
+        "text": {"content": msg},
+        "safe": 0,
+    }
+    try:
+        r = requests.post(WECHAT_URL, json=payload)
+        logger.info("WeCom response: %s", r.json())
+    except Exception as e:
+        logger.error("后台推送失败: %s", e)
+
 
 def _push_real_data():
     try:
         c, ct, n, nt = fetch_terror_info()
-        if c or n:
-            send_wecom_message(c, ct, n, nt)
+        if not all([c, ct, n, nt]):
+            msg = "当前恐怖地带: 信息未抓取到\n▶ 下一个恐怖地带: 信息未抓取到"
+        else:
+            msg = f"当前恐怖地带: {c}\n▶ 下一个恐怖地带: {n}"
+        push_to_wechat(msg)
     except Exception as e:
-        logger.exception("后台推送失败: %s", e)
-        requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": "后台异常▶后台异常"}}, timeout=5)
-# --------------------------------------------------------------
+        logger.error("后台推送失败: %s", e)
+
+
+@app.route("/")
+def index():
+    _push_real_data()
+    return "OK"
+
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(_push_real_data, "interval", minutes=5)
+    scheduler.start()
+    app.run(host="0.0.0.0", port=10000)
