@@ -1,93 +1,72 @@
-import os
-import requests
-import logging
+import os, requests, logging
 from flask import Flask
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from threading import Thread
 
-# 从环境变量读取企业微信机器人地址（部署时需配置）
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
-# 数据接口（直接获取JSON数据）
-TARGET_API = "https://www.d2tz.info/api/online"
+# 已设置为你的 WEBHOOK_URL
+WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0bcfe46-3aa1-4071-afd5-da63be5a8644"
+TARGET_URL  = "https://www.d2tz.info/?l=zh-cn"
 
-# 日志配置
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# 健康检查接口（解决Render部署超时）
-@app.route("/health")
-def health_check():
-    return "OK", 200
+def fetch_terror_info():
+    options = Options()
+    # 修正 chromium 二进制文件路径（原路径可能导致启动失败）
+    options.binary_location = "/usr/bin/chromium"
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    driver = webdriver.Chrome(options=options)
+    try:
+        driver.get(TARGET_URL)
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "tbody[role='rowgroup'] tr"))
+        )
+        rows = driver.find_elements(By.CSS_SELECTOR, "tbody[role='rowgroup'] tr")[:2]
+        out = []
+        for row in rows:
+            cells = row.find_elements(By.TAG_NAME, "td")
+            if len(cells) >= 2:
+                area_raw = cells[1].text.strip()
+                area_only = area_raw.split("▶")[-1]
+                out.append((cells[0].text.strip(), area_only))
+        if len(out) < 2:
+            return None, None, None, None
+        next_time, next_area = out[0]
+        current_time, current_area = out[1]
+        return current_area, current_time, next_area, next_time
+    finally:
+        driver.quit()
 
-# 根路由触发推送
+def send_wecom_message(c, ct, n, nt):
+    now  = c or "暂无"
+    soon = n or "暂无"
+    content = f"{now}▶{soon}"
+    rsp = requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": content}}, timeout=5)
+    logger.info("WeCom response: %s", rsp.json())
+
 @app.route("/")
 def index():
     Thread(target=_push_real_data, daemon=True).start()
     return "tz-d2tz is running!", 200
 
-def fetch_terror_info():
-    """通过API获取恐怖地带数据"""
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
-        }
-        response = requests.get(TARGET_API, headers=headers, timeout=10)
-        response.raise_for_status()  # 检查请求是否成功
-        data = response.json()
-
-        # 提取恐怖地带（terror为True的区域）
-        terror_zones = [zone["name"] for zone in data.get("zones", []) if zone.get("terror")]
-        
-        # 取前两个区域（当前和下一个）
-        current_area = terror_zones[0] if len(terror_zones) > 0 else None
-        next_area = terror_zones[1] if len(terror_zones) > 1 else None
-        
-        return current_area, "", next_area, ""  # 保持原返回格式
-    except Exception as e:
-        logger.error("获取数据失败: %s", str(e))
-        return None, None, None, None
-
-def send_wecom_message(c, ct, n, nt):
-    """发送企业微信消息"""
-    now = c or "暂无"
-    soon = n or "暂无"
-    content = f"{now}▶{soon}"
-    try:
-        if not WEBHOOK_URL:
-            logger.error("未配置WEBHOOK_URL，请检查环境变量")
-            return
-        rsp = requests.post(
-            WEBHOOK_URL,
-            json={"msgtype": "text", "text": {"content": content}},
-            timeout=10
-        )
-        logger.info("推送结果: %s", rsp.json())
-    except Exception as e:
-        logger.error("推送失败: %s", str(e))
-
 def _push_real_data():
-    """后台执行推送逻辑"""
     try:
         c, ct, n, nt = fetch_terror_info()
         if c or n:
             send_wecom_message(c, ct, n, nt)
-        else:
-            logger.warning("未获取到有效数据")
     except Exception as e:
-        logger.exception("后台推送异常")
-        # 异常时推送告警
-        if WEBHOOK_URL:
-            try:
-                requests.post(
-                    WEBHOOK_URL,
-                    json={"msgtype": "text", "text": {"content": "后台异常▶后台异常"}},
-                    timeout=10
-                )
-            except Exception as err:
-                logger.error("异常告警推送失败: %s", str(err))
+        logger.exception("后台推送失败: %s", e)
+        requests.post(WEBHOOK_URL, json={"msgtype": "text", "text": {"content": "后台异常▶后台异常"}}, timeout=5)
 
 if __name__ == "__main__":
-    # 使用Render分配的端口（必填）
+    # 端口默认值改为 10000（与 Render 要求一致）
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
