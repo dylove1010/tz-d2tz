@@ -8,92 +8,95 @@ from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ---------------- 配置 WeCom ----------------
-CORP_ID = "你的企业ID"
-AGENT_ID = "1000002"
-SECRET = "你的应用Secret"
-TO_USER = "@all"
 
-def get_access_token():
-    url = f"https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid={CORP_ID}&corpsecret={SECRET}"
-    resp = requests.get(url).json()
-    return resp["access_token"]
-
-def send_wecom_message(content):
-    try:
-        token = get_access_token()
-        url = f"https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token={token}"
-        payload = {
-            "touser": TO_USER,
-            "msgtype": "text",
-            "agentid": AGENT_ID,
-            "text": {"content": content},
-            "safe": 0
-        }
-        resp = requests.post(url, json=payload).json()
-        logger.info(f"WeCom response: {resp}")
-    except Exception as e:
-        logger.error(f"推送失败: {e}")
-
-# ---------------- 爬虫核心 ----------------
-def fetch_terror_info():
+def create_driver():
+    """创建稳定的 Chrome Driver"""
     options = Options()
-    options.add_argument("--headless=new")
+    options.add_argument("--headless=new")  # 新版 Chrome 推荐
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-software-rasterizer")
-    options.add_argument("--remote-debugging-port=9222")
-    # 解决 Render DNS 问题
-    options.add_argument("--host-resolver-rules=MAP * 8.8.8.8")
+    options.add_argument("--window-size=1920,1080")
+    return webdriver.Chrome(options=options)
 
-    driver = webdriver.Chrome(options=options)
+
+def fetch_terror_info():
+    """爬取恐怖地带信息（改自你 zip 里的原始逻辑）"""
+    url = "https://d2tz.com/danger.html"  # ⚠️ 原代码的目标网址
+    driver = create_driver()
+    driver.get(url)
+    time.sleep(3)  # 等页面加载
+
+    html = driver.page_source
+    driver.quit()
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    # 解析城市和恐怖地带信息
+    try:
+        city = soup.select_one("div#ct").get_text(strip=True)
+    except Exception:
+        city = "未知"
 
     try:
-        url = "https://d2.tzdata.org/"  # 你要爬的页面
-        driver.get(url)
-        time.sleep(3)
+        danger_zone = soup.select_one("div#c").get_text(strip=True)
+    except Exception:
+        danger_zone = "未知"
 
-        html = driver.page_source
-        soup = BeautifulSoup(html, "html.parser")
+    try:
+        next_city = soup.select_one("div#nt").get_text(strip=True)
+    except Exception:
+        next_city = "未知"
 
-        # 解析恐怖地带
-        current = soup.select_one("#current-terror")
-        next_ = soup.select_one("#next-terror")
+    try:
+        next_danger_zone = soup.select_one("div#n").get_text(strip=True)
+    except Exception:
+        next_danger_zone = "未知"
 
-        current_text = current.get_text(strip=True) if current else "未获取到"
-        next_text = next_.get_text(strip=True) if next_ else "未获取到"
+    return city, danger_zone, next_city, next_danger_zone
 
-        return current_text, next_text
-    finally:
-        driver.quit()
 
-# ---------------- 定时任务 ----------------
+def push_to_wechat(content):
+    """推送消息到微信（ServerChan 示例）"""
+    url = "https://sctapi.ftqq.com/YOUR_SENDKEY.send"  # ⚠️ 换成你自己的 ServerChan SendKey
+    data = {
+        "title": "恐怖地带预警",
+        "desp": content
+    }
+    resp = requests.post(url, data=data)
+    logger.info(f"推送结果: {resp.text}")
+
+
 def _push_real_data():
+    """定时任务：获取并推送数据"""
     try:
-        c, n = fetch_terror_info()
-        msg = f"当前恐怖地带 ▶ {c}\n下一个恐怖地带 ▶ {n}"
-        send_wecom_message(msg)
+        city, danger_zone, next_city, next_danger_zone = fetch_terror_info()
+        content = (
+            f"当前城市：{city}\n"
+            f"当前危险区域：{danger_zone}\n"
+            f"下一个城市：{next_city}\n"
+            f"下一个危险区域：{next_danger_zone}"
+        )
+        push_to_wechat(content)
     except Exception as e:
         logger.error(f"后台推送失败: {e}")
 
-scheduler = BackgroundScheduler(timezone="UTC")
-scheduler.add_job(_push_real_data, "interval", minutes=5)
-scheduler.start()
 
-# ---------------- Flask ----------------
+# Flask 路由
 @app.route("/")
 def index():
-    try:
-        c, n = fetch_terror_info()
-        msg = f"当前恐怖地带 ▶ {c}\n下一个恐怖地带 ▶ {n}"
-        return msg
-    except Exception as e:
-        logger.error(f"前台获取失败: {e}")
-        return "【获取失败】"
+    return "恐怖地带推送服务运行中..."
+
+
+# 启动定时任务
+scheduler = BackgroundScheduler()
+scheduler.add_job(_push_real_data, "interval", minutes=5)
+scheduler.start()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
