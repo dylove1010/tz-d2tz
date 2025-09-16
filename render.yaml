@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: tz-d2tz
+    env: python
+    buildCommand: "./render-build.sh"
+    startCommand: "python app.py"
+    envVars:
+      - key: PORT
+        value: 10000
+      # 注意：WEBHOOK_URL需在Render控制台手动配置（避免硬编码）
+    regions:
+      - oregon
+    plan: free
