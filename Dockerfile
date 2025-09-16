@@ -1,23 +1,27 @@
-# 使用 Python 官方镜像
+# 使用 Python 3.11  slim 镜像（轻量且兼容）
 FROM python:3.11-slim
 
 # 设置工作目录
 WORKDIR /app
 
-# 安装系统依赖（Chromium 浏览器及驱动）
+# 安装系统依赖：Chromium 浏览器、驱动及必要库
 RUN apt-get update && apt-get install -y \
-    chromium-browser \
+    chromium \
     chromium-driver \
-    && rm -rf /var/lib/apt/lists/*
+    libnss3 \
+    libgconf-2-4 \
+    libxi6 \
+    libxrender1 \
+    libxss1 \
+    libxtst6 \
+    && rm -rf /var/lib/apt/lists/*  # 清理缓存，减小镜像体积
 
-# 复制项目文件
-COPY . .
-
-# 安装 Python 依赖
+# 复制依赖文件并安装
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 暴露端口（与代码中 PORT 保持一致）
-EXPOSE 10000
+# 复制项目所有文件
+COPY . .
 
-# 启动命令（通过环境变量注入配置）
+# 启动命令（运行 Flask 应用）
 CMD ["python", "app.py"]
