@@ -1,14 +1,15 @@
 name: call-render
 on:
   schedule:
-    - cron: '10 * * * *'   # 每小时的 01 分，延迟 20-35 秒
-  workflow_dispatch:
+    - cron: '7 * * * *'  # 每小时1分触发（配合代码延迟20秒）
+  workflow_dispatch:  # 允许手动触发
+
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: curl root (delay 20s + retry)
+      - name: 延迟20秒后请求（匹配数据更新时间）
         run: |
           sleep 20
           curl -f --retry 3 --retry-delay 5 --max-time 30 \
-            https://tz-d2tz-1.onrender.com/
+            https://你的服务名.onrender.com/  # 替换为你的Render域名
