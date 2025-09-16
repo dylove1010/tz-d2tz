@@ -18,15 +18,17 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 def fetch_terror_info():
-    options = Options()
-    options.binary_location = "/usr/bin/chromium-browser"  # 修正浏览器路径
-    options.add_argument("--headless=new")
+     options = Options()
+    # 修正浏览器路径（关键：指向浏览器主程序而非驱动）
+    options.binary_location = "/usr/bin/chromium-browser"  # 这里修正为正确的chromium路径
+    options.add_argument("--headless=new")  # 新版无头模式更省内存
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    # 新增内存优化参数
     options.add_argument("--disable-images")
     options.add_argument("--window-size=800,600")
-    options.page_load_strategy = "eager"  # 优化加载策略
-
+    # 添加唯一用户数据目录（解决目录占用问题）
+    options.add_argument("--user-data-dir=/tmp/chromium-" + str(os.getpid()))
     driver = webdriver.Chrome(options=options)
     driver.set_page_load_timeout(15)  # 设置页面加载超时
     try:
