@@ -17,34 +17,21 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-def fetch_terror_info(max_retries=2):
-    """带重试机制的抓取函数"""
-    for attempt in range(max_retries + 1):
-        try:
-            options = Options()
-            # 浏览器路径（匹配Render安装路径）
-            options.binary_location = "/usr/bin/chromium-browser"
-            
-            # 强化资源优化参数
-            options.add_argument("--headless=new")  # 无头模式
-            options.add_argument("--no-sandbox")  # 解决权限问题
-            options.add_argument("--disable-dev-shm-usage")  # 避免共享内存不足
-            options.add_argument("--disable-gpu")  # 禁用GPU
-            options.add_argument("--disable-images")  # 禁用图片
-            options.add_argument("--disable-audio")  # 禁用音频
-            options.add_argument("--disable-popup-blocking")  # 禁用弹窗
-            options.add_argument("--window-size=1024,768")  # 更小窗口尺寸
-            options.add_argument("--single-process")  # 单进程模式
-            options.add_argument("--blink-settings=imagesEnabled=false")  # 彻底禁用图片
-            options.add_argument(f"--user-data-dir=/tmp/chromium-tmp-{os.urandom(8).hex()}")  # 随机临时目录
-            options.add_argument("--disable-extensions")
-            options.add_argument("--disable-plugins")
-            options.add_argument("--disable-software-rasterizer")  # 禁用软件光栅化
-            options.add_argument("--disable-translate")  # 禁用翻译
-            options.add_argument("--no-first-run")  # 跳过首次运行配置
-            
-            # 初始化驱动
-            driver = webdriver.Chrome(options=options)
+# app.py 中修正浏览器路径和优化参数
+def fetch_terror_info():
+    options = Options()
+    # 关键修正：指向浏览器主程序（而非驱动）
+    options.binary_location = "/usr/bin/chromium"  # 原先是 /usr/bin/chromium-driver（错误）
+    # 启用新版无头模式（内存更低）
+    options.add_argument("--headless=new")  # 原先是 --headless（旧模式）
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    # 新增内存优化参数
+    options.add_argument("--disable-images")  # 禁止加载图片，减少内存
+    options.add_argument("--window-size=800,600")  # 缩小窗口尺寸
+
+    driver = webdriver.Chrome(options=options)
+    # ... 其余代码不变 ...
             
             try:
                 # 延长超时时间（资源受限环境需要更长时间）
