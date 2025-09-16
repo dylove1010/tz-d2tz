@@ -18,11 +18,16 @@ app = Flask(__name__)
 
 def fetch_terror_info():
     options = Options()
-    # 修正 chromium 二进制文件路径（原路径可能导致启动失败）
-    options.binary_location = "/usr/bin/chromium"
-    options.add_argument("--headless")
+    # 关键修正：指向浏览器主程序（而非驱动）
+    options.binary_location = "/usr/bin/chromium"  # 原先是 /usr/bin/chromium-driver（错误）
+    # 启用新版无头模式（内存更低）
+    options.add_argument("--headless=new")  # 原先是 --headless（旧模式）
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    # 新增内存优化参数
+    options.add_argument("--disable-images")  # 禁止加载图片，减少内存
+    options.add_argument("--window-size=800,600")  # 缩小窗口尺寸
+
     driver = webdriver.Chrome(options=options)
     try:
         driver.get(TARGET_URL)
