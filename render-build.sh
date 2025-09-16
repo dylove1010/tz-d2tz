@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# 安装Chromium浏览器及配套驱动（必须，否则Selenium无法运行）
+# 安装Chromium及驱动
 sudo apt-get update
 sudo apt-get install -y chromium-browser chromium-chromedriver
-# 验证安装完整性
+# 验证安装
 if [ -f "/usr/bin/chromium-browser" ] && [ -f "/usr/bin/chromedriver" ]; then
     echo "Chromium及驱动安装成功"
 else
