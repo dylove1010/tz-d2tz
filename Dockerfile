@@ -1,18 +1,16 @@
-FROM python:3.11-slim
+FROM python:3.11-alpine
 
-# 安装浏览器和驱动
-RUN apt-get update && apt-get install -y \
+# 安装最小化依赖（仅 chromium 和必要库）
+RUN apk add --no-cache \
     chromium \
-    chromium-driver \
-    && rm -rf /var/lib/apt/lists/*
+    chromium-chromedriver \
+    && rm -rf /var/cache/apk/*  # 清理缓存
 
 WORKDIR /app
 
-# 先复制依赖文件并安装，利用 Docker 缓存加速后续构建
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt --upgrade pip  # 增加 --upgrade pip 确保工具正常
+RUN pip install --no-cache-dir -r requirements.txt
 
-# 再复制应用代码
 COPY app.py .
 
 EXPOSE 10000
