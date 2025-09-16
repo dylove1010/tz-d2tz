@@ -1,2 +1,3 @@
 flask==3.0.3
-requests==2.31.0  # 用于API请求，替代selenium
+requests==2.31.0
+gunicorn==21.2.0  # 生产级服务器，解决部署超时
