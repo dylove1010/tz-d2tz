@@ -9,5 +9,5 @@ services:
       - key: PORT
         value: 10000
       - key: WEBHOOK_URL  # 在这里设置企业微信机器人地址
-        value: "你的企业微信webhook地址"  # 替换为实际值
+        value: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0bcfe46-3aa1-4071-afd5-da63be5a8644"  # 替换为实际值
     # 构建和启动由 Dockerfile 自动处理
