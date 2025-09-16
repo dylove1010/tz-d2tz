@@ -1,5 +1,5 @@
-flask
-selenium
-beautifulsoup4
-apscheduler
-requests
+Flask==2.3.2
+apscheduler==3.10.4
+selenium==4.27.1
+beautifulsoup4==4.12.3
+requests==2.31.0
