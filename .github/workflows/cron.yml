@@ -1,18 +1,14 @@
-FROM python:3.11-slim
-
-ENV PYTHONUNBUFFERED=1
-
-# 安装 chromium 和 chromedriver
-RUN apt-get update && apt-get install -y \
-    chromium chromium-driver \
-    fonts-liberation \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-
-CMD ["python", "app.py"]
+name: call-render
+on:
+  schedule:
+    - cron: '10 * * * *'   # 每小时的 01 分，延迟 20-35 秒
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: curl root (delay 20s + retry)
+        run: |
+          sleep 20
+          curl -f --retry 3 --retry-delay 5 --max-time 30 \
+            https://tz-d2tz-1.onrender.com/
