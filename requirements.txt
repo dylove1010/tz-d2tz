@@ -1,4 +1,4 @@
 selenium==4.23.0
 flask==3.0.3
 requests==2.32.3
-gunicorn==22.0.0  # 新增，确保Render能正常启动服务
+gunicorn==22.0.0  # 确保gunicorn安装
