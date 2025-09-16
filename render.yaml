@@ -2,8 +2,12 @@ services:
   - type: web
     name: tz-d2tz
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      chmod +x render-build.sh
+      ./render-build.sh
+      pip install -r requirements.txt
     startCommand: gunicorn -w 1 -b 0.0.0.0:$PORT app:app
     envVars:
       - key: PORT
-        value: 10000  # 仅保留 PORT 变量，因为代码中依赖它动态获取端口
+        value: 10000
+    # 移除错误的webhook环境变量（代码中已写死）
