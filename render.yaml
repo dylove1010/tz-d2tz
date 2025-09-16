@@ -3,9 +3,10 @@ services:
     name: tz-d2tz
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -w 1 -b 0.0.0.0:$PORT app:app  # 使用gunicorn启动
+    startCommand: gunicorn -w 1 -b 0.0.0.0:$PORT app:app
     envVars:
       - key: PORT
         value: 10000
-      - key: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0bcfe46-3aa1-4071-afd5-da63be5a8644
-        sync: false  # 部署时手动输入你的企业微信机器人地址
+      - key: WEBHOOK_URL
+        value: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0bcfe46-3aa1-4071-afd5-da63be5a8644"  # 部署时请填写你的企业微信机器人地址
+        sync: false
