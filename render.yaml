@@ -6,7 +6,4 @@ services:
     startCommand: gunicorn -w 1 -b 0.0.0.0:$PORT app:app
     envVars:
       - key: PORT
-        value: 10000
-      - key: WEBHOOK_URL
-        value: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b0bcfe46-3aa1-4071-afd5-da63be5a8644"  # 部署时请填写你的企业微信机器人地址
-        sync: false
+        value: 10000  # 仅保留 PORT 变量，因为代码中依赖它动态获取端口
