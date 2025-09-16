@@ -1,20 +1,11 @@
-# 使用官方 selenium 基础镜像，已经自带 Chrome 和 ChromeDriver
-FROM selenium/standalone-chrome:120.0
-
-# 设置 Python 环境
-RUN apt-get update && apt-get install -y python3 python3-pip
-
-# 设置工作目录
-WORKDIR /app
-
-# 复制依赖文件
+FROM python:3.11-slim
+ENV PYTHONUNBUFFERED=1
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium-driver fonts-liberation && \
+    rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
-
-# 安装依赖
-RUN pip3 install --no-cache-dir -r requirements.txt
-
-# 复制代码
-COPY . .
-
-# 运行 Flask
-CMD ["python3", "app.py"]
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . /app
+WORKDIR /app
+ENV PORT=10000
+CMD ["python", "app.py"]
