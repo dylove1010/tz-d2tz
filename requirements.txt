@@ -1,4 +1,2 @@
-selenium==4.23.0
 flask==3.0.3
-requests==2.32.3
-beautifulsoup4==4.12.3  # 备用解析方案
+requests==2.31.0  # 用于API请求，替代selenium
