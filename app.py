@@ -10,7 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from threading import Thread
 
 # 从环境变量读取Webhook地址（优先于硬编码）
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")  # 从环境变量获取
 TARGET_URL = "https://www.d2tz.info/?l=zh-cn"
 
 # 日志配置
