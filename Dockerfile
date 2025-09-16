@@ -1,24 +1,20 @@
-# 使用官方 Python 镜像
-FROM python:3.11-slim
+# 使用官方 selenium 基础镜像，已经自带 Chrome 和 ChromeDriver
+FROM selenium/standalone-chrome:120.0
 
-ENV PYTHONUNBUFFERED=1
+# 设置 Python 环境
+RUN apt-get update && apt-get install -y python3 python3-pip
 
-# 安装系统依赖 & Google Chrome
-RUN apt-get update && apt-get install -y wget gnupg2 unzip curl ca-certificates \
-    && mkdir -p /etc/apt/keyrings \
-    && wget -q -O- https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor > /etc/apt/keyrings/google.gpg \
-    && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update && apt-get install -y google-chrome-stable chromium-driver \
-    && rm -rf /var/lib/apt/lists/*
-
+# 设置工作目录
 WORKDIR /app
 
-# 安装 Python 依赖
+# 复制依赖文件
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# 拷贝代码
-COPY . /app
+# 安装依赖
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# 启动 Flask
-CMD ["python", "app.py"]
+# 复制代码
+COPY . .
+
+# 运行 Flask
+CMD ["python3", "app.py"]
